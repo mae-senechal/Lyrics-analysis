@@ -1,0 +1,319 @@
+
+---
+title: "Analyse des Paroles et Création de Playlists - Version Combinée"
+output: html_document
+---
+
+
+---
+title: "Analyse des Paroles et des Sentiments"
+output: html_document
+---
+
+```{r setup_playlist, include=FALSE}
+# Chargement des bibliothèques nécessaires
+library(jsonlite)
+library(rvest)
+library(httr)
+library(dplyr)
+library(tidytext)
+library(ggplot2)
+library(stringr)
+library(syuzhet)
+library(wordcloud)
+library(RColorBrewer)
+library(cld3)
+library(readr)
+```
+
+## 1. Fonction pour Rechercher les Titres
+
+```{r}
+search_genius_titles <- function() {
+  query <- readline(prompt = "Entrez le terme de recherche : ")
+  query_encoded <- URLencode(query)
+  search_url <- paste0("https://api.genius.com/search?q=", query_encoded)
+  access_token <- "VF2kBVMQK5k34vcRngI2gYLe1WbSWBIfAUMZXyMRGfy6H7P5BxOALj82-qgV0VNA"
+  response <- GET(search_url, add_headers(Authorization = paste("Bearer", access_token)))
+  if (status_code(response) == 200) {
+    raw_text <- content(response, "text", encoding = "UTF-8")
+    url_matches <- regmatches(raw_text, gregexpr('"url":"(https://genius.com/[^"]+lyrics)"', raw_text))
+    if (length(url_matches[[1]]) > 0) {
+      cat("Liste des chansons et URLs trouvées :
+")
+      count <- 1
+      results <- list()
+      for (url in url_matches[[1]]) {
+        clean_url <- gsub('"url":"|"', '', url)
+        info <- gsub('https://genius.com/|(-lyrics)', '', clean_url)
+        title_artist <- gsub("-", " ", info)
+        results[[count]] <- list(title_artist = title_artist, url = clean_url)
+        cat(paste(count, "-", title_artist, "
+URL:", clean_url, "
+
+"))
+        count <- count + 1
+      }
+      choice <- as.numeric(readline(prompt = "Entrez le numéro de la chanson souhaitée : "))
+      if (!is.na(choice) && choice > 0 && choice <= length(results)) {
+        selected_result <- results[[choice]]
+        cat("
+Vous avez sélectionné :
+")
+        cat("Titre/Artiste :", selected_result$title_artist, "
+")
+        cat("URL           :", selected_result$url, "
+")
+        return(selected_result$url)
+      } else {
+        cat("Choix invalide. Aucune sélection effectuée.
+")
+        return(NULL)
+      }
+    } else {
+      cat("Aucune URL trouvée.
+")
+      return(NULL)
+    }
+  } else {
+    cat("Erreur lors de la récupération des résultats. Code d'erreur:", status_code(response), "
+")
+    return(NULL)
+  }
+}
+```
+
+## 2. Fonction pour Récupérer les Paroles
+
+```{r}
+scrape_genius_lyrics <- function(song_url) {
+  page_html <- tryCatch({
+    read_html(song_url, options = "HUGE")
+  }, error = function(e) {
+    return(NULL)
+  })
+  if (is.null(page_html)) {
+    return("Erreur : Impossible de charger la page.")
+  }
+  lyrics_nodes <- page_html %>%
+    html_nodes('[data-lyrics-container="true"]')
+  if (length(lyrics_nodes) == 0) {
+    return("Paroles non trouvées ou chargées dynamiquement par JavaScript.")
+  }
+  lyrics <- lyrics_nodes %>%
+    html_text2() %>%
+    paste(collapse = "
+")
+  return(lyrics)
+}
+```
+
+## 3. Analyse de la Fréquence des Mots
+
+```{r}
+analyze_word_frequency <- function(lyrics) {
+  if (is.null(lyrics)) {
+    cat("Impossible d'effectuer l'analyse de fréquence des mots.
+")
+    return(NULL)
+  }
+  lyrics_df <- data.frame(line = 1:length(lyrics), text = lyrics, stringsAsFactors = FALSE)
+  words <- lyrics_df %>%
+    unnest_tokens(word, text) %>%
+    mutate(word = str_replace_all(word, "[’‘]", "'")) %>%
+    anti_join(stop_words, by = "word")
+  word_freq <- words %>%
+    count(word, sort = TRUE)
+  return(word_freq)
+}
+```
+
+## 4. Visualisation des Résultats
+
+```{r}
+visualize_word_frequency <- function(word_freq) {
+  if (is.null(word_freq)) {
+    return(NULL)
+  }
+  top_words <- word_freq %>%
+    top_n(20, n) %>%
+    arrange(desc(n))
+  ggplot(top_words, aes(x = reorder(word, n), y = n)) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+    coord_flip() +
+    theme_minimal() +
+    labs(title = "Top 20 Mots les Plus Fréquents dans les Paroles",
+         x = "Mots",
+         y = "Fréquence")
+}
+```
+
+## 5. Création de Nuages de Mots
+
+```{r}
+create_wordcloud <- function(word_freq) {
+  if (is.null(word_freq)) {
+    return(NULL)
+  }
+  top_words <- word_freq %>%
+    top_n(100, n)
+  wordcloud(words = top_words$word, freq = top_words$n, 
+            max.words = 100, random.order = FALSE, 
+            colors = brewer.pal(8, "Dark2"))
+}
+```
+
+## 6. Exécution des Fonctions
+
+```{r}
+selected_url <- search_genius_titles()
+if (!is.null(selected_url)) {
+  lyrics <- scrape_genius_lyrics(selected_url)
+  if (!is.null(lyrics)) {
+    word_freq <- analyze_word_frequency(lyrics)
+    if (!is.null(word_freq)) {
+      visualize_word_frequency(word_freq)
+      create_wordcloud(word_freq)
+    }
+  }
+}
+```
+
+
+## Section Ajoutée : Création de Playlist en Fonction du Sentiment
+
+
+---
+title: "Analyse des Paroles et Création de Playlists"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Chargement des bibliothèques nécessaires
+library(jsonlite)
+library(rvest)
+library(httr)
+library(dplyr)
+library(tidytext)
+library(ggplot2)
+library(stringr)
+library(syuzhet)
+library(wordcloud)
+library(RColorBrewer)
+library(cld3)
+library(readr)
+```
+
+## 1. Recherche des Titres
+
+```{r}
+search_genius_titles <- function() {
+  query <- readline(prompt = "Entrez le terme de recherche : ")
+  query_encoded <- URLencode(query)
+  search_url <- paste0("https://api.genius.com/search?q=", query_encoded)
+  access_token <- "VF2kBVMQK5k34vcRngI2gYLe1WbSWBIfAUMZXyMRGfy6H7P5BxOALj82-qgV0VNA"
+  response <- GET(search_url, add_headers(Authorization = paste("Bearer", access_token)))
+  if (status_code(response) == 200) {
+    raw_text <- content(response, "text", encoding = "UTF-8")
+    url_matches <- regmatches(raw_text, gregexpr('"url":"(https://genius.com/[^"]+lyrics)"', raw_text))
+    if (length(url_matches[[1]]) > 0) {
+      cat("Liste des chansons trouvées :
+")
+      for (url in url_matches[[1]]) {
+        clean_url <- gsub('"url":"|"', '', url)
+        cat(clean_url, "
+")
+      }
+      return(url_matches)
+    } else {
+      cat("Aucune chanson trouvée.
+")
+      return(NULL)
+    }
+  } else {
+    cat("Erreur :", status_code(response), "
+")
+    return(NULL)
+  }
+}
+```
+
+## 2. Récupération des Paroles
+
+```{r}
+scrape_genius_lyrics <- function(song_url) {
+  page_html <- tryCatch({
+    read_html(song_url, options = "HUGE")
+  }, error = function(e) {
+    return(NULL)
+  })
+  if (is.null(page_html)) {
+    return("Erreur : Impossible de charger la page.")
+  }
+  lyrics_nodes <- page_html %>%
+    html_nodes('[data-lyrics-container="true"]')
+  if (length(lyrics_nodes) == 0) {
+    return("Paroles non trouvées.")
+  }
+  lyrics <- lyrics_nodes %>%
+    html_text2() %>%
+    paste(collapse = "
+")
+  return(lyrics)
+}
+```
+
+## 3. Création de Playlist en Fonction du Sentiment
+
+### Chargement des Lexiques de Sentiment
+
+```{r}
+french_sentiment_lexicon <- read_csv("french_sentiment_lexicon.csv - Feuille 1-3.csv")
+german_sentiment_lexicon <- read_csv("german_sentiment_lexicon.csv - Feuille 1-3.csv")
+```
+
+### Fonction Simplifiée pour Créer une Playlist
+
+```{r}
+create_sentiment_playlist <- function(search_term, desired_sentiment, max_songs) {
+  # Exemple simplifié : Générer une playlist fictive basée sur les paramètres
+  playlist <- data.frame(
+    title = paste(search_term, "Song", 1:max_songs),
+    sentiment = rep(desired_sentiment, max_songs),
+    artist = paste("Artist", 1:max_songs)
+  )
+  return(playlist)
+}
+
+create_and_save_playlist <- function(search_term, desired_sentiment, max_songs = 40) {
+  cat("Recherche des chansons pour le terme :", search_term, "
+")
+  playlist <- create_sentiment_playlist(
+    search_term = search_term, 
+    desired_sentiment = desired_sentiment, 
+    max_songs = max_songs
+  )
+  if (is.null(playlist)) {
+    cat("Aucune chanson trouvée.
+")
+    return(NULL)
+  }
+  write_csv(playlist, "playlist_base.csv")
+  cat("Playlist sauvegardée : 'playlist_base.csv'
+")
+  return(playlist)
+}
+```
+
+### Création de Playlist et Sauvegarde
+
+```{r}
+search_term <- "love"
+desired_sentiment <- "joy"
+playlist <- create_and_save_playlist(search_term, desired_sentiment)
+if (!is.null(playlist)) {
+  cat("Playlist créée avec succès.
+")
+}
+```
+
