@@ -1,0 +1,104 @@
+---
+title: 'Présentation du Projet : Analyse des Paroles et Création de Playlists'
+author: "Selim Dridi, Guillaume Bousson, Maé Sénéchal"
+date: "2025-01-10"
+output:
+  pdf_document: default
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+---
+title: "Analyse des Paroles et Création de Playlists"
+output: 
+  pdf_document:
+    latex_engine: pdflatex
+---
+
+```{r setup, include=FALSE}
+# Charger les packages nécessaires
+library(jsonlite)
+library(rvest)
+library(httr)
+library(dplyr)
+library(tidytext)
+library(ggplot2)
+library(stringr)
+library(syuzhet)
+library(wordcloud)
+library(RColorBrewer)
+library(cld3)
+library(readr)
+
+# Installer et configurer TinyTeX si nécessaire
+if (!requireNamespace("tinytex", quietly = TRUE)) {
+  install.packages("tinytex")
+}
+
+if (!tinytex::is_tinytex()) {
+  tinytex::install_tinytex()
+}
+
+# **Introduction**
+Ce projet vise à analyser les paroles de chansons en utilisant R. Les fonctionnalités principales incluent :
+- La recherche de paroles via l'API Genius.
+- L'analyse des fréquences de mots et des sentiments.
+- La génération de nuages de mots et de visualisations basées sur les émotions.
+- La création de playlists en fonction des sentiments détectés.
+
+L'objectif est de fournir des outils intuitifs pour explorer les émotions véhiculées par la musique et d'automatiser certaines tâches analytiques.
+
+---
+
+# **Problèmes rencontrés**
+## **1. Gestion des APIs**
+- **Problème** : Difficulté à configurer et utiliser l'API Genius.
+- **Solution** : Ajouter un token d'accès personnel et s'assurer de respecter les quotas d'appels.
+
+## **2. Chargement dynamique des paroles**
+- **Problème** : Certaines paroles sont chargées dynamiquement via JavaScript, ce qui rend leur extraction difficile avec `rvest`.
+- **Solution** : Réutilisation d'éléments HTML précis (`data-lyrics-container`) pour cibler les paroles.
+
+## **3. Analyse multilingue**
+- **Problème** : Détecter correctement la langue des paroles et adapter l'analyse des sentiments en fonction.
+- **Solution** : Utilisation du package `cld3` pour détecter la langue et des lexiques spécifiques pour le français, l'anglais et l'allemand.
+
+## **4. Visualisation et erreurs de dépendances**
+- **Problème** : Les dépendances comme `wordcloud` ou `ggplot2` peuvent provoquer des erreurs ou des conflits.
+- **Solution** : Réinstaller et charger les bibliothèques dans l'ordre approprié.
+
+## **5. Problèmes plus général**
+
+- **Problème** : Nous avions pour idée de proposer des musiques similaires aux musiques que l'on cherche le soucis étant que l'API ne le permettait car le traitement de données n'étaient pas supportés, cela supposait de faire du marchine learning, de créer un programme beaucoup plus complexe. 
+---
+
+# **Forces du projet**
+## **1. Automatisation**
+- Le projet automatise la recherche, l'extraction et l'analyse de paroles.
+- Capacité à traiter un grand nombre de chansons rapidement.
+
+## **2. Analyse multilingue**
+- Intégration de lexiques pour analyser les paroles en plusieurs langues.
+- Visualisations adaptées aux émotions identifiées.
+
+## **3. Interactivité**
+- Possibilité pour l'utilisateur de choisir les chansons à analyser et les paramètres à personnaliser.
+
+## **4. Génération de playlists**
+- Création automatique de playlists basées sur un sentiment spécifique.
+
+---
+
+# **Faiblesses du projet**
+## **1. Dépendance aux APIs**
+- Le fonctionnement du projet repose sur l'API Genius, limitant la portée en cas de restrictions d'accès ou de quotas dépassés.
+
+## **2. Langues supportées limitées**
+- Bien que multilingue, le projet ne supporte que les lexiques en anglais, français et allemand.
+
+## **3. Complexité pour les débutants**
+- La configuration initiale (clé API, dépendances R) peut être difficile pour les nouveaux utilisateurs.
+
+---
