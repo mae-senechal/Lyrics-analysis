@@ -1,4 +1,4 @@
-Lyrics Analysis and Playlist Creation
+Lyrics Analysis and Playlist Creation : Avec Selim Dridi et Guillaume Bousson
 
 Description
 
